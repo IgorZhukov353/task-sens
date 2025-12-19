@@ -33,13 +33,13 @@ jobs:
           arduino-cli compile --fqbn arduino:avr:mega --build-path ./build ./task-sens
           ls ./task-sens
           ls ./build
-      - name: Archive code main-elf
+      - name: Archive code task-sens-elf
         uses: actions/upload-artifact@v4
         with:
-          name: main-elf
-          path: ./build/main.ino.elf
-      - name: Archive code main-hex
+          name: task-sens-elf
+          path: ./build/task-sens.ino.elf
+      - name: Archive code task-sens-hex
         uses: actions/upload-artifact@v4
         with:
-          name: main-hex
-          path: ./build/main.ino.hex
+          name: task-sens-hex
+          path: ./build/task-sens.ino.hex
