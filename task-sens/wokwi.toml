@@ -1,4 +1,4 @@
 [wokwi]
 version = 1
-firmware = 'main.ino.hex'
-elf = 'main.ino.elf'
+firmware = 'task-sens.ino.hex'
+elf = 'task-sens.ino.elf'
