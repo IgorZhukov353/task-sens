@@ -1,10 +1,10 @@
-#define ARDUINOJSON_ENABLE_PROGMEM 1
-#include <ArduinoJson.h>
+//#define ARDUINOJSON_ENABLE_PROGMEM 1
+//#include <ArduinoJson.h>
 #include <RTClib.h>
 
 #include "util.h"
-#include "task.h"
 #include "main.h"
+#include "task.h"
 
 //---------------------------------------------------------------------------
 #define MAX_PIN  4
@@ -123,15 +123,15 @@ void Task::processing()
     PinOptions s;
     if (preState == States::_nextStep || preState == States::_firstStep || preState == States::_lastStep) {
       curMode = false;
-      s = (preState == States::_firstStep) ? PinOptions::_atStart :
+      s = (PinOptions)((preState == States::_firstStep) ? PinOptions::_atStart :
           (preState == States::_lastStep) ? PinOptions::_atFinish | PinOptions::_startFirstStep_finishLastStep | PinOptions::_atBetween :
-          PinOptions::_atBetween;
+          PinOptions::_atBetween);
       pinProcessing(s);
       //trace("1.1 preState=" + String(preState) + " state=" + String(state) + " now=" + String(now) + " mode=" + String(curMode));
     }
     if (state == States::_firstStep || state == States::_lastStep) {
       curMode = true;
-      s = (state == States::_firstStep) ? PinOptions::_atStart | PinOptions::_startFirstStep_finishLastStep : PinOptions::_atFinish;
+      s = (PinOptions)((state == States::_firstStep) ? PinOptions::_atStart | PinOptions::_startFirstStep_finishLastStep : PinOptions::_atFinish);
       pinProcessing(s);
       //trace("1.2 preState=" + String(preState) + " state=" + String(state) + " now=" + String(now) + " mode=" + String(curMode));
     }
@@ -271,7 +271,7 @@ void taskInit(String json) {
     trace_begin(F("Ошибка десериализации: "));
     trace_s(error.f_str());
     trace_end();
-    return false;
+    return;
   }
   for (int i = 0; i < doc.size(); i++) {
     JsonObject root = doc[i];
@@ -280,7 +280,7 @@ void taskInit(String json) {
     uint32_t duration = root[F("d")];
     if (!id || (!online && !duration)) { //
       trace(F("Не указан \"id\" или \"duration\" задачи!"));
-      return false;
+      return;
     }
 
     Task *t = getFreeTask(id);  // поиск структуры команды

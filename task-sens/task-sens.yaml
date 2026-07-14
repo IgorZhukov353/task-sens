@@ -1,0 +1,10 @@
+profiles:
+  mega:
+    notes: testing the limit of the AVR platform, may be unstable
+    fqbn: arduino:avr:mega
+    platforms:
+      - platform: arduino:avr (1.8.4)
+    libraries:
+      - dir: c:/projects/home/library
+
+default_profile: mega

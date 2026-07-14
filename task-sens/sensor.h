@@ -1,7 +1,7 @@
 /*
   Igor Zhukov (c)
   Created:       01-09-2025
-  Last changed:  01-09-2025
+  Last changed:  29-12-2025
 */
 
 //---------------------------------------------------------------------------
@@ -13,7 +13,7 @@ class Sensor {
     int8_t value, preValue;
     _Type type;
     int virtual check() = 0;
-    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject root) {
+    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject &root) {
       id = _id;
       type = _type;
       pin = _ppin;
@@ -50,14 +50,14 @@ class TempSensor : public Sensor {
     };
   public:
     TempSensor() {};
-    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject root);
+    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject &root);
     int virtual check();
 };
 //---------------------------------------------------------------------------
 class LED : public Sensor, public Activity {
   public:
     uint16_t origTimeout;
-    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject root);
+    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject &root);
     int virtual check(){return run();}
     int virtual actionRunFunc();
 };
@@ -68,18 +68,34 @@ class PIN : public Sensor {
     uint32_t lastActivated;
     uint8_t normval : 1;
     byte sysledoff : 1;
-    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject root);
+    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject &root);
     int virtual check();
+};
+//---------------------------------------------------------------------------
+class ANALOGPIN : public Sensor, public Activity {
+  public:
+    uint16_t r1,r2;
+    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject &root);
+    int virtual check(){return run();}
+    int virtual actionRunFunc();
+};
+//---------------------------------------------------------------------------
+class IPPING : public Sensor, public Activity {
+  public:
+    byte currIndex;
+    void virtual init(byte _id, _Type _type, byte _ppin, JsonObject &root);
+    int virtual check();
+    int virtual actionRunFunc();
 };
 //---------------------------------------------------------------------------
 class SensorArray : public Activity {
   public:
     byte len;
-    byte temper_ptr, led_ptr, pin_ptr;
+    byte temper_ptr, led_ptr, pin_ptr, analogpin_ptr, ping_ptr;
     byte groupCurPtr;
     //----------------------------
-    void init(JsonDocument root);
+    void init(JsonDocument &doc);
     int virtual actionRunFunc();
-    check(byte sensorMask = 0, byte actMask = 0);
-    load(String json);
+    int check(byte sensorMask = 0, byte actMask = 0);
+    int load(JsonDocument &doc);
 };
