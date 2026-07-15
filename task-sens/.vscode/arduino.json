@@ -1,1 +1,6 @@
-1
+{
+    "board": "arduino:avr:mega",
+    "sketch": "task-sens.ino",
+    "output": "build",
+    "otherLibrariesFolders": "C:\\projects\\home\\libraries"
+}
