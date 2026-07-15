@@ -11,6 +11,7 @@
 // enum class _ErrorType {NONE=0,HTTP_FAIL=1,TIMEOUT=2,OTHER=3,CONNECT=4,BUFFOVER=5};
 enum class _STATE {OK = 0, ERR = 1, HTTP = 2, HTTP_OK = 3, CLOSED = 4, ALREADY = 5};
 enum class _ErrorType {NONE=0,HTTP_FAIL=1,BUFFOVER=2,ALREADY_CONNECT=3,YANDEX_ONLY=4,TIMEOUT=20,OTHER=21,CONNECT=22};
+enum _SendPar:byte {_SSL=1,_MYHOME_HOST=2,_HTTP_PUT=4,_HTTP_PATCH=8};
 
 #define MAX_PING 10
 
@@ -24,6 +25,8 @@ public:
 
   char buffer[1500];
   byte wifi_initialized:1;
+  bool yandexOnly:1;
+
   unsigned long lastWIFISended;
   unsigned short sendErrorCounter;
   unsigned short httpFailCounter;
@@ -40,15 +43,18 @@ public:
   unsigned long sendCounter_ForAll;
   unsigned long bytesSended;
   short maxSendedMSG;
-  bool yandexOnly:1;
+  
+  byte hourWatchDog;
 
+  APP(){hourWatchDog=254;};
   void setup();
   void configRead();
 
   bool espSerialSetup();
   bool espSendCommand(const String& cmd, const _STATE goodResponse, const unsigned long timeout, const char *postBuf=NULL, const String &cmd2="");
 
-  bool _send2site(const String &reqStr, const char *postBuf);
+  bool __send2site(const byte opt, const String& metod, const String& host, const String& reqStr, const String& authStr, const char *postBuf=nullptr);
+  bool _send2site(const String &reqStr, const char *postBuf=nullptr);
   bool send2site(const String& reqStr){return _send2site(reqStr, NULL);};
   bool sendBuffer2Site();
 
@@ -57,7 +63,7 @@ public:
   void addTempHum2Buffer(byte id, int8_t temp, int8_t hum);
   void addSens2Buffer(byte id, byte val);
 
-  int responseProcessing(const String& response){};
+  int responseProcessing(const String& response);
 
   bool checkInitialized();
   bool check_Wait_Internet();
@@ -66,7 +72,10 @@ public:
   void closeConnect();
   bool sendError_check();
   
-  void esp_power_switch(bool p){};
+  void esp_power_switch(bool p);
+  void remoteRebootExecute(int act);
+
+  void sendWatchDog();
 };
 
 

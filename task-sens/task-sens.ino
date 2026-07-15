@@ -1,19 +1,43 @@
 /*
   Igor Zhukov (c)
   Created:       01-09-2025
-  Last changed:  19-12-2025
+  Last changed:  15-07-2026
 */
+#define VERSION "Ver 2.000 of 15-07-2026 Igor Zhukov (C)"
 
-#include <SD.h>
+#include<Arduino.h>
 #include <RTClib.h>
-#include "util.h"
+#include <avr/wdt.h>
+#include <OneWire.h>
+#include <dht.h>
+#include <DallasTemperature.h>
+#include <SD.h>
 
 //---------------------------------------------------------------------------
 #define MAIN 1
 #include "main.h"
+#include "util.h"
+#include "sensor.h"
 
 #define CS_PIN 53
-short mem;
+
+class SendBuffer2SiteActivity : public Activity{ // передача буфера информации раз в 2 секунду (если есть что)
+public:  
+ SendBuffer2SiteActivity(){timeout = 2000;};
+ int virtual actionRunFunc(){app.sendBuffer2Site();};
+} sb;
+
+class ReadCommandActivity : public Activity{ // проверка наличия команд для выполнения
+public:  
+  ReadCommandActivity(){timeout = 60 * 1000;};
+  int virtual actionRunFunc(){app.send2site(F("get_command.php"));};
+} rc;
+
+class CheckNetErrorActivity : public Activity{ // проверка наличия команд для выполнения
+public:  
+  CheckNetErrorActivity(){timeout = 60 * 2000;};
+  int virtual actionRunFunc(){app.sendError_check();};
+} ne;
 
 //---------------------------------------------------------------------------
 void APP::configRead()
@@ -61,35 +85,112 @@ void APP::configRead()
   }
   JsonArray arr = doc[F("ping")];
   int maxind = (arr.size() > MAX_PING)? MAX_PING: arr.size();
+  trace_begin(F("ping ip: "));
   for (int i = 0; i < maxind; i++) {
     check_tcp_last_byte[i] = doc[F("ping")][i];
-    trace_begin(F("ping ip: "));
     trace_i(check_tcp_last_byte[i]);
-    trace_end();
+    if( i < maxind - 1)
+      trace_c(",");
   }
+  trace_end();
   sensorLoad(doc);
 }
+//---------------------------------------------------------------------------
+void APP::sendWatchDog(){
+  auto ti = RTC.now();
 
+  if(hourWatchDog != 254 && (ti.hour() == hourWatchDog || ti.minute() != 0))
+    return;
+  hourWatchDog = ti.hour();
+  uint32_t t = ti.secondstime();
+  String dopInfo;
+  dopInfo.reserve(255);
+  dopInfo = "";
+  for (int i = 0;; i++) {  // результаты последних пингов видеорегистратора и камер
+    if (check_tcp_last_byte[i]) {
+      if (check_tcp_err[i]) {
+        if (dopInfo != "")
+          dopInfo += ",";
+        dopInfo += check_tcp_last_byte[i];
+      }
+    }
+    else
+      break;
+  }
+  if (dopInfo != "") {
+    dopInfo = String(F("PingErr:")) + dopInfo + " ";
+  }
+  dopInfo += F("M=");
+  dopInfo += (floor((((float)ramMemory / 1024)) * 100) / 100);
+  dopInfo += F(" Snd=");
+  dopInfo += sendCounter_ForAll;
+  dopInfo += F(" SndKB=");
+  dopInfo += bytesSended / 1024;
+  if (sendErrorCounter_ForAll) {
+    dopInfo += F(" SErr=");
+    dopInfo += sendErrorCounter_ForAll;
+  }
+  if (httpFailCounter) {
+    dopInfo += F(" HttpErr=");
+    dopInfo += httpFailCounter;
+  }
+  if (timeoutCounter) {
+    dopInfo += F(" ToErr=");
+    dopInfo += timeoutCounter;
+  }
+  if (buffOverCounter) {
+    dopInfo += F(" BOvrErr=");
+    dopInfo += buffOverCounter;
+  }
+  if (connectFailCounter) {
+    dopInfo += F(" ConnErr=");
+    dopInfo += connectFailCounter;
+  }
+
+  if (routerRebootCount) {
+    dopInfo += F(" RR=");
+    dopInfo += routerRebootCount;
+    dopInfo += F("(");
+    dopInfo += ((t - lastRouterReboot) / (60*60));
+    dopInfo += F("h.)");
+  }
+  t -= startTime;
+  unsigned int d = t / (24*60*60);
+  unsigned int h = (t % (24*60*60)) / (60*60);
+
+  String str = F("T=");
+  if (d > 0) {
+    str += d;
+    str += F("d.");
+  }
+  str += h;
+  str += F("h. (");
+  str += dopInfo;
+  str += F(")");
+
+  trace_begin(F("Snd Info: "));
+  trace_s(str);
+  trace_end();
+
+  addEvent2Buffer(3, str);
+}
 //---------------------------------------------------------------------------
 void setup()
 {
-  mem = checkMemoryFree();
+  wdt_enable(WDTO_8S); // 6-02-2025 !watchdog!
   RTC.begin();
-
-  trace("1.MEM=" + String(mem) + " " + String(__DATE__) + " " + String(__TIME__));
+  trace(F(VERSION));
 
   pinMode(48, INPUT_PULLUP);
   pinMode(49, INPUT_PULLUP);
 
   app.setup();
   app.configRead();
-
-  mem = checkMemoryFree();
-  trace("2.MEM=" + String(mem));
 }
 
 void loop()
 {
+
   if (digitalRead(48) == LOW)
   {
     delay(500);
@@ -102,12 +203,13 @@ void loop()
     delay(500);
     taskInit("[{\"id\":6,\"w\":1}]");
   }
+
   taskProcessing();
   sensorProcessing();
-  short m = checkMemoryFree();
-  if (mem != m)
-  {
-    mem = m;
-    trace("3.MEM=" + String(mem));
-  }
+
+  app.sendWatchDog();
+//  sb.run();
+//  rc.run();
+//  ne.run();
+  wdt_reset(); // 6-02-2025 !watchdog!
 }

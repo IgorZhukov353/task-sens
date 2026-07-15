@@ -183,18 +183,26 @@ bool APP::sendBuffer2Site() {
 void APP::closeConnect() {
   if(wifi_initialized){
     espSendCommand(F("AT+CWQAP"), _STATE::OK, 15000 );
-    //delay(1000);
     wdt_delay(1000); // 6-02-2025 !watchdog!
     espSendCommand(F("AT+RST"), _STATE::OK , 20000 );
-    //delay(1000); 
     wdt_delay(1000); // 6-02-2025 !watchdog!
     wifi_initialized = false;
     esp_power_switch(false);
   }  
 }
-
 //------------------------------------------------------------------------
-bool APP::sendError_check() {
+void APP::esp_power_switch(bool p) {
+  if (p == true) {
+    pinMode(29, OUTPUT);
+    digitalWrite(29, LOW);
+  } else {
+    digitalWrite(29, HIGH);
+    pinMode(29, INPUT);
+  }
+}
+//------------------------------------------------------------------------
+bool APP::sendError_check()
+{
   {
     trace_begin(F("MEM="));
     trace_i(checkMemoryFree());
@@ -218,39 +226,46 @@ bool APP::sendError_check() {
     trace_i(yandexOnly);
     trace_end();
   }
-  
+
   bool res;
-  if(sendErrorCounter > 3)
+  if (sendErrorCounter > 3)
     res = false;
-  else  
-    res = 1; //ping(F("192.168.8.1"), 5000); // попытка пингануть модем    
-    
-  if(!res){
+  else
+    res = 1; // ping(F("192.168.8.1"), 5000); // попытка пингануть модем
+
+  if (!res)
+  {
     res = ping(HOST_IP_STR, 15000); // попытка пингануть свой сервер
-    if(res){ // все наладилось
-        res = ping(HOST_IP_STR, 15000, 1); // попытка соединиться со своим сервером через TCP
-        if(res){ // все действительно наладилось
-          ping(HOST_IP_STR, 15000, 2);  // отсоединиться
-          sendErrorCounter = 0;
-          yandexOnly = false;
-          return 0;
-        }
+    if (res)
+    {                                    // все наладилось
+      res = ping(HOST_IP_STR, 15000, 1); // попытка соединиться со своим сервером через TCP
+      if (res)
+      {                              // все действительно наладилось
+        ping(HOST_IP_STR, 15000, 2); // отсоединиться
+        sendErrorCounter = 0;
+        yandexOnly = false;
+        return 0;
+      }
     }
-  else {
-    res = ping(F("ya.ru"), 5000); // попытка пингануть яндекс
-    if(res){ // 6-01-2026 возможно отключен мобильный интернет по БПЛА-опасности (доступен только яндекс), перегружать нет смысла, нужно ждать когда будет доступен HOST_IP_STR
-      yandexOnly = true;  
-      return 0;
+    else
+    {
+      res = ping(F("ya.ru"), 5000); // попытка пингануть яндекс
+      if (res)
+      { // 6-01-2026 возможно отключен мобильный интернет по БПЛА-опасности (доступен только яндекс), перегружать нет смысла, нужно ждать когда будет доступен HOST_IP_STR
+        yandexOnly = true;
+        return 0;
+      }
     }
-  }
 
     res = ping(F("192.168.0.1"), 5000); // попытка пингануть роутер
-    if (!res && lastErrorTypeId == _ErrorType::TIMEOUT && lastRouterReboot > lastWIFISended) {  // роутер не отвечает на ping, последняя ошибка была по таймауту и последнее успешное отправление было до перезагрузки роутера -> перегрузить МЕГУ
-      wdt_enable(WDTO_8S);                                                                     // Для тестов не рекомендуется устанавливать значение менее 8 сек
-      delay(10000); // перезагрузка
-      return 0; // сюда уже не попадем
+    if (!res && lastErrorTypeId == _ErrorType::TIMEOUT && lastRouterReboot > lastWIFISended)
+    {                      // роутер не отвечает на ping, последняя ошибка была по таймауту и последнее успешное отправление было до перезагрузки роутера -> перегрузить МЕГУ
+      wdt_enable(WDTO_8S); // Для тестов не рекомендуется устанавливать значение менее 8 сек
+      delay(10000);        // перезагрузка
+      return 0;            // сюда уже не попадем
     }
-    if(millis() - lastRouterReboot > (60000 * 60) ){ // если роутер отвечает на ping, то проблема с доступом в Инет (модем, кончились деньги и т.п.), инче проблема в роутере -> перегрузить роутер (но не чаще чем в 1 час)
+    if (millis() - lastRouterReboot > (60000 * 60))
+    {                 // если роутер отвечает на ping, то проблема с доступом в Инет (модем, кончились деньги и т.п.), инче проблема в роутере -> перегрузить роутер (но не чаще чем в 1 час)
       closeConnect(); // izh 22-05-2020 отключить от WIFI
       lastRouterReboot = millis();
       routerRebootCount++;
@@ -260,10 +275,26 @@ bool APP::sendError_check() {
       buffOverCounter = 0;
       connectFailCounter = 0;
       yandexOnly = false;
+
+      remoteRebootExecute(1); // перегрузить роутер
       return 1;
-      //return 0;
-      }
     }
+  }
   return 0;
+}
+//------------------------------------------------------------------------
+// удаленная перезагрузка всех устройств
+void APP::remoteRebootExecute(int act) {
+  int pin = (act == 1) ? 24 : 30;  // 24 - роутер; 30 - камеры, регистратор
+  trace(F("Rebooting..."));
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, LOW);
+  wdt_delay(1000 * 10); // 6-02-2025 !watchdog!
+  digitalWrite(pin, HIGH);
+  pinMode(pin, INPUT);
+  if(act == 1){ // если перегружаем роутер - ждем 2 мин 
+    wdt_delay(1000 * 60 * 2); // 6-02-2025 !watchdog!
+  }
+  trace(F("Rebooted."));
 }
 
