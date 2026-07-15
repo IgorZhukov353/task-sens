@@ -1,0 +1,11 @@
+{  
+  "version": "2.0.0",  
+  "tasks": [
+    {
+      "label": "__Run local arduino-cli",
+      "type": "shell",
+      "command": "c:\\Projects\\HOME\\task-sens\\build.cmd",
+      "problemMatcher": []
+    }
+  ]  
+}  
